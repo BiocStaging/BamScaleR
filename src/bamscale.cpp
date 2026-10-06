@@ -469,7 +469,7 @@ Rcpp::RObject xstringset_from_packed(const PackedStringColumn& col,
 //
 // Rsamtools::scanBam returns numeric SAM tags with their native R type (e.g.
 // NM:i as an integer vector, a float tag as a numeric vector), reserving
-// character output for A/Z/H/B tags. BamScale mirrors that here: each tag column
+// character output for A/Z/H/B tags. BamScaleR mirrors that here: each tag column
 // is accumulated as the widest type it needs, so a homogeneous numeric tag never
 // pays for per-value string formatting or per-value CHARSXP allocation. Columns
 // only fall back to character when a genuinely non-numeric value appears.

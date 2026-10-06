@@ -55,6 +55,14 @@ the compact \verb{(fragment_size, count)} table crosses back into R (cf.
 \code{scanBam(what = "isize")} followed by \code{table(abs(isize))}, which materialises
 every insert size in R first).
 }
+\examples{
+bam <- ompBAM::example_BAM("Unsorted")
+
+# Fragment-size (insert-size) distribution computed inside the reader
+fs <- fragment_sizes(bam, threads = 2)
+head(fs)
+
+}
 \seealso{
 \code{\link[=bam_read]{bam_read()}} for reading records, \code{\link[=bam_count]{bam_count()}} for per-chromosome
 counts.

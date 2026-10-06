@@ -8,10 +8,10 @@
 #include "bigWig.h"
 #include "bwCommon.h"
 
-// --- BamScale local modification ---------------------------------------------
+// --- BamScaleR local modification ---------------------------------------------
 // zlib deflate level used when compressing bigWig data/zoom blocks. -1 keeps
 // zlib's default (Z_DEFAULT_COMPRESSION, level 6) so upstream behaviour is
-// unchanged; BamScale sets this (e.g. to 1) to trade file size for a much faster
+// unchanged; BamScaleR sets this (e.g. to 1) to trade file size for a much faster
 // write. Read once per compress() call; safe because writing is single-threaded.
 int bwCompressLevel = -1;
 
@@ -22,9 +22,9 @@ int bwCompressLevel = -1;
 // serial writer -- compress2 is deterministic and blocks are written in the same
 // order at the same offsets. Single-writer assumption (one bigWig at a time).
 int bwsParallel = 0;
-int bwsVerbose = 0;   /* BamScale: print bwFinalize phase timings when != 0 */
+int bwsVerbose = 0;   /* BamScaleR: print bwFinalize phase timings when != 0 */
 
-// BamScale: in-memory coverage runs for building zoom levels without re-reading
+// BamScaleR: in-memory coverage runs for building zoom levels without re-reading
 // (and re-decompressing) the just-written data. When registered, constructZoomLevels
 // expands these runs (skipping zero runs) as intervals in the same order the file
 // iterator would yield them, so the zoom buffers -- and the file -- stay identical.
@@ -341,7 +341,7 @@ error:
     return 2;
 }
 
-// --- BamScale: parallel block compression -----------------------------------
+// --- BamScaleR: parallel block compression -----------------------------------
 // Compress n blocks across OpenMP threads, then write + index them sequentially
 // in the given order (identical offsets/order to the serial writer). src[i] holds
 // the raw block bytes (24-byte header already filled) of length srcLen[i]; the
@@ -463,7 +463,7 @@ static int flushBuffer(bigWigFile_t *fp) {
 
     if(sz) {
         if(bwsParallel) {
-            //BamScale: capture the raw block (header already filled above) for
+            //BamScaleR: capture the raw block (header already filled above) for
             //deferred parallel compression instead of compressing inline.
             unsigned char *copy;
             if(bwsN >= bwsCap) {
@@ -483,7 +483,7 @@ static int flushBuffer(bigWigFile_t *fp) {
             if(bwsN >= BWS_BATCH) { if(bwsFlushBatch(fp)) return 11; }
             return 0;
         }
-        //compress (BamScale: compress2 with tunable level; -1 == zlib default)
+        //compress (BamScaleR: compress2 with tunable level; -1 == zlib default)
         if(compress2(wb->compressP, &sz, wb->p, wb->l, bwCompressLevel) != Z_OK) return 9;
 
         //write the data to disk
@@ -1171,7 +1171,7 @@ int constructZoomLevels(bigWigFile_t *fp) {
 
     for(i=0; i<fp->cl->nKeys; i++) {
       if(bwsRunV) {
-        //BamScale: feed intervals from the in-memory coverage runs instead of
+        //BamScaleR: feed intervals from the in-memory coverage runs instead of
         //re-reading + decompressing the data section. Emit only non-zero runs, in
         //ascending order -- the same interval sequence the file iterator yields --
         //so the zoom buffers are identical.
@@ -1254,7 +1254,7 @@ int writeZoomLevels(bigWigFile_t *fp) {
         fp->writeBuffer->firstIndexNode = NULL;
         fp->writeBuffer->currentIndexNode = NULL;
         if(bwsParallel) {
-            //BamScale: compress this level's zoom blocks (all in memory) in parallel,
+            //BamScaleR: compress this level's zoom blocks (all in memory) in parallel,
             //then write + index them in order (byte-identical to the serial path).
             unsigned long zn = 0, zi = 0;
             bwZoomBuffer_t *zc = zb;
@@ -1430,7 +1430,7 @@ int bwFinalize(bigWigFile_t *fp) {
     //Flush the buffer
     if(flushBuffer(fp)) return 1; //Valgrind reports a problem here!
 
-    //BamScale: write all deferred data blocks in parallel (must happen before
+    //BamScaleR: write all deferred data blocks in parallel (must happen before
     //nBlocks is recorded and before constructZoomLevels re-reads the data).
     if(bwsParallel) { if(bwsFlushBatch(fp)) return 1; }
 

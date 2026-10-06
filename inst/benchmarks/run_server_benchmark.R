@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 suppressPackageStartupMessages({
-  library(BamScale)
+  library(BamScaleR)
 })
 
 
@@ -50,12 +50,12 @@ suppressPackageStartupMessages({
 
 
 assert_bamscale_symbols <- function() {
-  required <- c("_BamScale_read_bam_cpp", "_BamScale_count_bam_cpp")
+  required <- c("_BamScaleR_read_bam_cpp", "_BamScaleR_count_bam_cpp")
   missing <- required[!vapply(
     required,
     function(sym) {
       isTRUE(tryCatch({
-        getNativeSymbolInfo(sym, PACKAGE = "BamScale")
+        getNativeSymbolInfo(sym, PACKAGE = "BamScaleR")
         TRUE
       }, error = function(e) FALSE))
     },
@@ -65,8 +65,8 @@ assert_bamscale_symbols <- function() {
   if (length(missing) > 0L) {
     stop(
       paste0(
-        "BamScale native symbols are not loaded: ", paste(missing, collapse = ", "), "\n",
-        "Reinstall BamScale from source and re-run."
+        "BamScaleR native symbols are not loaded: ", paste(missing, collapse = ", "), "\n",
+        "Reinstall BamScaleR from source and re-run."
       ),
       call. = FALSE
     )
@@ -278,7 +278,7 @@ stop_bpparam <- function(bp) {
 # it here re-baselines the read harness's multi comparators (disclosed in run
 # notes). The same package set is pre-loaded for every arm, so both sides start
 # from identical worker state.
-start_bpparam_preloaded <- function(bp, pkgs = c("BamScale", "Rsamtools", "GenomicAlignments")) {
+start_bpparam_preloaded <- function(bp, pkgs = c("BamScaleR", "Rsamtools", "GenomicAlignments")) {
   if (is.null(bp)) return(invisible(NULL))
   try(BiocParallel::bpstart(bp), silent = TRUE)
   try(BiocParallel::bplapply(seq_len(BiocParallel::bpnworkers(bp)), function(i, pk) {
@@ -651,7 +651,7 @@ compare_plain_df <- function(lhs, rhs) {
 }
 
 make_correctness_region <- function(bam, window_bp = 1000L) {
-  seed <- BamScale::bam_read(
+  seed <- BamScaleR::bam_read(
     file = bam,
     what = c("rname", "pos", "flag"),
     as = "data.frame",
@@ -792,7 +792,7 @@ run_correctness_preflight <- function(single_file, workloads, active_workloads, 
       {
         if (w %in% c("step1", "seqqual")) {
           fields <- workloads[[w]]$what
-          bam_df <- plain_df(BamScale::bam_read(
+          bam_df <- plain_df(BamScaleR::bam_read(
             file = single_file,
             what = fields,
             as = "data.frame",
@@ -808,7 +808,7 @@ run_correctness_preflight <- function(single_file, workloads, active_workloads, 
           compare_plain_df(bam_df, ref_df)
         } else {
           fields <- c("qname", "rname", "pos", "cigar", "strand", "flag")
-          bam_ga <- BamScale::bam_read(
+          bam_ga <- BamScaleR::bam_read(
             file = single_file,
             what = fields,
             as = "GAlignments",
@@ -1316,7 +1316,7 @@ compare_against_baseline <- function(current_df, baseline_df, slowdown_threshold
       )
     )
   )
-  out$gate_scope <- if (scope == "all") TRUE else out$method_family == "BamScale"
+  out$gate_scope <- if (scope == "all") TRUE else out$method_family == "BamScaleR"
   out$gate_regression <- out$gate_scope & out$comparison_status == "regressed"
   out[order(out$scenario, out$workload, out$method_family, out$method, out$bp_workers_effective, out$threads_effective), , drop = FALSE]
 }
@@ -1456,7 +1456,7 @@ write_artifact_manifest <- function(out_dir) {
     list(file = "env_vars.csv", category = "metadata", description = "Threading-related environment variables captured for the run."),
     list(file = "config.txt", category = "metadata", description = "Parsed CLI options and effective benchmark configuration."),
     list(file = "sessionInfo.txt", category = "metadata", description = "R session information for package and platform provenance."),
-    list(file = "plot_single_scaling.png", category = "plots", description = "Auto-generated single-file BamScale scaling plot, if ggplot2 is available."),
+    list(file = "plot_single_scaling.png", category = "plots", description = "Auto-generated single-file BamScaleR scaling plot, if ggplot2 is available."),
     list(file = "plot_multi_scaling.png", category = "plots", description = "Auto-generated multi-file scaling plot, if ggplot2 is available.")
   )
 
@@ -1481,7 +1481,7 @@ plot_if_possible <- function(summary_df, out_dir) {
   ok <- summary_df[summary_df$status == "ok", , drop = FALSE]
   if (nrow(ok) == 0L) return(invisible(FALSE))
 
-  p1_df <- ok[ok$scenario == "single" & ok$method_family == "BamScale", , drop = FALSE]
+  p1_df <- ok[ok$scenario == "single" & ok$method_family == "BamScaleR", , drop = FALSE]
   if (nrow(p1_df) > 0L) {
     p <- ggplot2::ggplot(
       p1_df,
@@ -1491,7 +1491,7 @@ plot_if_possible <- function(summary_df, out_dir) {
       ggplot2::geom_point(size = 2) +
       ggplot2::scale_x_continuous(breaks = sort(unique(p1_df$threads_effective))) +
       ggplot2::labs(
-        title = "Single-file scaling (BamScale)",
+        title = "Single-file scaling (BamScaleR)",
         x = "Threads",
         y = "Median elapsed (s)",
         color = "Workload"
@@ -1806,7 +1806,7 @@ if (isTRUE(cfg$compute_records)) {
   message("Computing single-file record counts...")
   for (w in cfg$single_workloads) {
     spec <- workloads[[w]]
-    ref <- BamScale::bam_read(
+    ref <- BamScaleR::bam_read(
       file = single_file,
       what = spec$what,
       as = spec$as,
@@ -1831,7 +1831,7 @@ if (isTRUE(cfg$compute_records)) {
     spec <- workloads[[w]]
     total <- 0
     for (f in multi_files) {
-      ref <- BamScale::bam_read(
+      ref <- BamScaleR::bam_read(
         file = f,
         what = spec$what,
         as = spec$as,
@@ -1917,8 +1917,8 @@ for (w in cfg$single_workloads) {
       make_case_meta(
         scenario = "single",
         workload = w,
-        method = "BamScale",
-        method_family = "BamScale",
+        method = "BamScaleR",
+        method_family = "BamScaleR",
         comparison_track = "fair",
         seqqual_mode = if (w == "seqqual") "compatible" else NA_character_,
         auto_threads = FALSE,
@@ -1941,8 +1941,8 @@ for (w in cfg$single_workloads) {
           run_case(
             scenario = "single",
             workload = w_local,
-            method = "BamScale",
-            method_family = "BamScale",
+            method = "BamScaleR",
+            method_family = "BamScaleR",
             threads_requested = t_local,
             threads_effective = t_local,
             bp_workers_requested = 1L,
@@ -1953,7 +1953,7 @@ for (w in cfg$single_workloads) {
             iterations = cfg$iterations,
             warmup = cfg$warmup,
             fun = function() {
-              BamScale::bam_read(
+              BamScaleR::bam_read(
                 file = single_file,
                 what = spec_local$what,
                 as = spec_local$as,
@@ -1979,8 +1979,8 @@ for (w in cfg$single_workloads) {
         make_case_meta(
           scenario = "single",
           workload = w,
-          method = "BamScale (compact seqqual)",
-          method_family = "BamScale",
+          method = "BamScaleR (compact seqqual)",
+          method_family = "BamScaleR",
           comparison_track = "optimized",
           seqqual_mode = "compact",
           auto_threads = FALSE,
@@ -2002,8 +2002,8 @@ for (w in cfg$single_workloads) {
             run_case(
               scenario = "single",
               workload = "seqqual",
-              method = "BamScale (compact seqqual)",
-              method_family = "BamScale",
+              method = "BamScaleR (compact seqqual)",
+              method_family = "BamScaleR",
               threads_requested = t_local,
               threads_effective = t_local,
               bp_workers_requested = 1L,
@@ -2014,7 +2014,7 @@ for (w in cfg$single_workloads) {
               iterations = cfg$iterations,
               warmup = cfg$warmup,
               fun = function() {
-                BamScale::bam_read(
+                BamScaleR::bam_read(
                   file = single_file,
                   what = spec_local$what,
                   as = spec_local$as,
@@ -2164,7 +2164,7 @@ if (isTRUE(cfg$include_multi)) {
 
       threads_each <- max(1L, floor(cfg$max_threads / workers))
       auto_plan <- if (isTRUE(cfg$include_auto_threads) && workers > 1L) {
-        BamScale:::.bamscale_resolve_parallel_plan(
+        BamScaleR:::.bamscale_resolve_parallel_plan(
           threads = threads_each,
           BPPARAM = bp_template,
           auto_threads = TRUE,
@@ -2179,8 +2179,8 @@ if (isTRUE(cfg$include_multi)) {
         make_case_meta(
           scenario = "multi",
           workload = w,
-          method = "BamScale (balanced budget)",
-          method_family = "BamScale",
+          method = "BamScaleR (balanced budget)",
+          method_family = "BamScaleR",
           comparison_track = "fair",
           seqqual_mode = if (w == "seqqual") "compatible" else NA_character_,
           auto_threads = FALSE,
@@ -2209,8 +2209,8 @@ if (isTRUE(cfg$include_multi)) {
             run_case(
               scenario = "multi",
               workload = w_local,
-              method = "BamScale (balanced budget)",
-              method_family = "BamScale",
+              method = "BamScaleR (balanced budget)",
+              method_family = "BamScaleR",
               threads_requested = threads_local,
               threads_effective = threads_local,
               bp_workers_requested = workers_local,
@@ -2221,7 +2221,7 @@ if (isTRUE(cfg$include_multi)) {
               iterations = cfg$iterations,
               warmup = cfg$warmup,
               fun = function() {
-                BamScale::bam_read(
+                BamScaleR::bam_read(
                   file = multi_files,
                   what = spec_local$what,
                   as = spec_local$as,
@@ -2247,8 +2247,8 @@ if (isTRUE(cfg$include_multi)) {
           make_case_meta(
             scenario = "multi",
             workload = w,
-            method = "BamScale (adaptive auto_threads)",
-            method_family = "BamScale",
+            method = "BamScaleR (adaptive auto_threads)",
+            method_family = "BamScaleR",
             comparison_track = "adaptive",
             seqqual_mode = if (w == "seqqual") "compatible" else NA_character_,
             auto_threads = TRUE,
@@ -2278,8 +2278,8 @@ if (isTRUE(cfg$include_multi)) {
               run_case(
                 scenario = "multi",
                 workload = w_local,
-                method = "BamScale (adaptive auto_threads)",
-                method_family = "BamScale",
+                method = "BamScaleR (adaptive auto_threads)",
+                method_family = "BamScaleR",
                 threads_requested = threads_local,
                 threads_effective = plan_local$threads,
                 bp_workers_requested = workers_local,
@@ -2290,7 +2290,7 @@ if (isTRUE(cfg$include_multi)) {
                 iterations = cfg$iterations,
                 warmup = cfg$warmup,
                 fun = function() {
-                  BamScale::bam_read(
+                  BamScaleR::bam_read(
                     file = multi_files,
                     what = spec_local$what,
                     as = spec_local$as,
@@ -2317,8 +2317,8 @@ if (isTRUE(cfg$include_multi)) {
           make_case_meta(
             scenario = "multi",
             workload = w,
-            method = "BamScale (compact seqqual budget)",
-            method_family = "BamScale",
+            method = "BamScaleR (compact seqqual budget)",
+            method_family = "BamScaleR",
             comparison_track = "optimized",
             seqqual_mode = "compact",
             auto_threads = FALSE,
@@ -2346,8 +2346,8 @@ if (isTRUE(cfg$include_multi)) {
               run_case(
                 scenario = "multi",
                 workload = "seqqual",
-                method = "BamScale (compact seqqual budget)",
-                method_family = "BamScale",
+                method = "BamScaleR (compact seqqual budget)",
+                method_family = "BamScaleR",
                 threads_requested = threads_local,
                 threads_effective = threads_local,
                 bp_workers_requested = workers_local,
@@ -2358,7 +2358,7 @@ if (isTRUE(cfg$include_multi)) {
                 iterations = cfg$iterations,
                 warmup = cfg$warmup,
                 fun = function() {
-                  BamScale::bam_read(
+                  BamScaleR::bam_read(
                     file = multi_files,
                     what = spec_local$what,
                     as = spec_local$as,

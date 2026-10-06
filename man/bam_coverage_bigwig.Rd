@@ -70,6 +70,15 @@ The written values are identical to
 unmapped reads are dropped by default). Coverage values are integers stored as
 the bigWig \code{float} type, which is exact for depths up to \code{2^24}.
 }
+\examples{
+bam <- ompBAM::example_BAM("Unsorted")
+
+# Single pass from BAM to a finished bigWig track
+out <- tempfile(fileext = ".bw")
+bam_coverage_bigwig(bam, out, threads = 2)
+file.exists(out)
+
+}
 \seealso{
 \code{\link[=bam_coverage]{bam_coverage()}} for the in-memory \code{RleList}.
 }

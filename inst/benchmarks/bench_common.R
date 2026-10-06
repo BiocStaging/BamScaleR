@@ -1,4 +1,4 @@
-# bench_common.R -- shared helpers for the BamScale workflow benchmarks.
+# bench_common.R -- shared helpers for the BamScaleR workflow benchmarks.
 #
 # This module is sourced by run_workflow_benchmark.R. It intentionally defines
 # functions only (no side effects on source) so it can be reused by other
@@ -64,7 +64,7 @@
 
 .wf_detect_cores <- function() {
     # Honor Linux cpuset limits (containers/schedulers) before falling back to
-    # detectCores(), matching BamScale's own core detection.
+    # detectCores(), matching BamScaleR's own core detection.
     if (.Platform$OS.type == "unix" && file.exists("/proc/self/status")) {
         status <- tryCatch(readLines("/proc/self/status", warn = FALSE),
                            error = function(e) character())
@@ -314,7 +314,7 @@
     )
 }
 
-.wf_pkg_versions <- function(pkgs = c("BamScale", "Rsamtools", "GenomicAlignments",
+.wf_pkg_versions <- function(pkgs = c("BamScaleR", "Rsamtools", "GenomicAlignments",
                                       "rtracklayer", "ompBAM", "BiocParallel", "ATACseqQC")) {
     v <- vapply(pkgs, function(p) tryCatch(as.character(utils::packageVersion(p)),
                                            error = function(e) NA_character_), character(1))

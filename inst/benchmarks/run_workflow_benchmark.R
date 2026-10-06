@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # run_workflow_benchmark.R
 #
-# End-to-end workflow benchmarks for BamScale, complementing the read-pattern
+# End-to-end workflow benchmarks for BamScaleR, complementing the read-pattern
 # micro-benchmarks in run_server_benchmark.R. Two workflows are measured as a
 # read / compute / write phase decomposition so the report can state the Amdahl
 # bound on the end-to-end speedup explicitly:
@@ -9,7 +9,7 @@
 #   1. coverage  : readGAlignments/bam_read -> coverage() [RleList] -> export.bw()
 #   2. atacqc    : scanBam/bam_read isize    -> table(abs(isize)) fragment sizes
 #
-# In each workflow BamScale replaces exactly the BAM-read step; the compute and
+# In each workflow BamScaleR replaces exactly the BAM-read step; the compute and
 # write steps are byte-identical work on both arms. Single-file cases sweep the
 # OpenMP thread axis and report per-phase timing; multi-file cases sweep the
 # BiocParallel worker axis (fixed core budget) and report end-to-end wall-clock
@@ -25,13 +25,13 @@
 #     --outdir=benchmark_results
 
 suppressWarnings(suppressMessages({
-    ok <- requireNamespace("BamScale", quietly = TRUE) &&
+    ok <- requireNamespace("BamScaleR", quietly = TRUE) &&
         requireNamespace("Rsamtools", quietly = TRUE) &&
         requireNamespace("GenomicAlignments", quietly = TRUE) &&
         requireNamespace("rtracklayer", quietly = TRUE) &&
         requireNamespace("BiocParallel", quietly = TRUE)
 }))
-if (!ok) stop("Required packages missing (BamScale, Rsamtools, GenomicAlignments, rtracklayer, BiocParallel).")
+if (!ok) stop("Required packages missing (BamScaleR, Rsamtools, GenomicAlignments, rtracklayer, BiocParallel).")
 
 .wf_script_dir <- function() {
     ca <- commandArgs(FALSE)
@@ -42,7 +42,7 @@ if (!ok) stop("Required packages missing (BamScale, Rsamtools, GenomicAlignments
 source(file.path(.wf_script_dir(), "bench_common.R"))
 
 # ---------------------------------------------------------------------------
-# Workflow pipelines (BamScale replaces only the read phase)
+# Workflow pipelines (BamScaleR replaces only the read phase)
 # ---------------------------------------------------------------------------
 
 .wf_atac_flag <- function() {
@@ -57,8 +57,8 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
     # the other skips. Read exactly the 4 fields readGAlignments uses; omitting
     # `what` would default to 7 incl. the packed qname (an unfair extra decode).
     flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
-    reader <- if (identical(engine, "BamScale")) {
-        function() BamScale::bam_read(path, what = c("rname", "pos", "cigar", "strand"),
+    reader <- if (identical(engine, "BamScaleR")) {
+        function() BamScaleR::bam_read(path, what = c("rname", "pos", "cigar", "strand"),
                                       as = "GAlignments", threads = threads, BPPARAM = NULL, param = flt)
     } else {
         function() GenomicAlignments::readGAlignments(path, param = flt)
@@ -79,10 +79,10 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
 
 .wf_cov_multi <- function(paths, engine, threads, bp, write_bigwig) {
     flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
-    worker <- if (identical(engine, "BamScale")) {
+    worker <- if (identical(engine, "BamScaleR")) {
         force(threads); force(write_bigwig); force(flt)
         function(p) {
-            ga  <- BamScale::bam_read(p, what = c("rname", "pos", "cigar", "strand"),
+            ga  <- BamScaleR::bam_read(p, what = c("rname", "pos", "cigar", "strand"),
                                       as = "GAlignments", threads = threads, BPPARAM = NULL, param = flt)
             cvg <- GenomicAlignments::coverage(ga)
             if (isTRUE(write_bigwig)) { bw <- tempfile(fileext = ".bw"); rtracklayer::export.bw(cvg, bw); unlink(bw) }
@@ -105,11 +105,11 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
 
 .wf_atac_single <- function(path, engine, threads) {
     FLAG <- .wf_atac_flag()
-    reader <- if (identical(engine, "BamScale")) {
+    reader <- if (identical(engine, "BamScaleR")) {
         # Pass a real ScanBamParam (a plain scanBamFlag integer via list(flag=)
         # is NOT honored by bam_read and would apply no filter). Read only
         # `isize` to mirror scanBam(what="isize") exactly.
-        function() BamScale::bam_read(path, what = "isize", as = "data.frame",
+        function() BamScaleR::bam_read(path, what = "isize", as = "data.frame",
                                       threads = threads, BPPARAM = NULL,
                                       param = Rsamtools::ScanBamParam(flag = FLAG))
     } else {
@@ -124,10 +124,10 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
 
 .wf_atac_multi <- function(paths, engine, threads, bp) {
     FLAG <- .wf_atac_flag()
-    worker <- if (identical(engine, "BamScale")) {
+    worker <- if (identical(engine, "BamScaleR")) {
         force(threads); force(FLAG)
         function(p) {
-            d <- BamScale::bam_read(p, what = "isize", as = "data.frame",
+            d <- BamScaleR::bam_read(p, what = "isize", as = "data.frame",
                                     threads = threads, BPPARAM = NULL,
                                     param = Rsamtools::ScanBamParam(flag = FLAG))
             length(table(abs(d$isize)))
@@ -147,7 +147,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
 
 # ---------------------------------------------------------------------------
 # New-API workloads: the four C++ aggregation endpoints as first-class arms.
-# The BamScale side is a single fused call (read+compute+write inside C++), so
+# The BamScaleR side is a single fused call (read+compute+write inside C++), so
 # it reports total-only; the standard side reuses the phase-decomposed recipes.
 # ---------------------------------------------------------------------------
 
@@ -164,7 +164,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
          write   = c(elapsed = 0, user = 0, sys = 0))
 }
 
-# Registry: per API workload, the BamScale fused call, the standard phase recipe,
+# Registry: per API workload, the BamScaleR fused call, the standard phase recipe,
 # the per-file worker closures for multi, and metadata. `t` = OpenMP threads.
 .wf_api_registry <- function(cfg) {
     FLAG <- .wf_atac_flag()
@@ -174,12 +174,12 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
             include = cfg$include_fastcov,
             std_method = "GenomicAlignments::readGAlignments -> coverage",
             std_family = "GenomicAlignments",
-            pkgs = c("BamScale", "GenomicAlignments"),
+            pkgs = c("BamScaleR", "GenomicAlignments"),
             bs_single = function(f, t) .wf_total_only(function()
-                BamScale::bam_coverage(f, threads = t, BPPARAM = NULL)),
+                BamScaleR::bam_coverage(f, threads = t, BPPARAM = NULL)),
             std_single = function(f) .wf_cov_single(f, "std", 1L, write_bigwig = FALSE),
             bs_worker = function(t) { force(t); function(p)
-                length(BamScale::bam_coverage(p, threads = t, BPPARAM = NULL)) },
+                length(BamScaleR::bam_coverage(p, threads = t, BPPARAM = NULL)) },
             std_worker = function() function(p) {
                 flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
                 length(GenomicAlignments::coverage(GenomicAlignments::readGAlignments(p, param = flt)))
@@ -189,17 +189,17 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
             include = cfg$include_bigwig,
             std_method = "GenomicAlignments::readGAlignments -> coverage -> export.bw",
             std_family = "GenomicAlignments",
-            pkgs = c("BamScale", "GenomicAlignments", "rtracklayer"),
+            pkgs = c("BamScaleR", "GenomicAlignments", "rtracklayer"),
             bs_single = function(f, t) .wf_total_only(function() {
                 bw <- tempfile(fileext = ".bw")
                 on.exit(unlink(bw), add = TRUE)
-                BamScale::bam_coverage_bigwig(f, bw, threads = t, parallel = TRUE, BPPARAM = NULL)
+                BamScaleR::bam_coverage_bigwig(f, bw, threads = t, parallel = TRUE, BPPARAM = NULL)
             }),
             std_single = function(f) .wf_cov_single(f, "std", 1L, write_bigwig = TRUE),
             bs_worker = function(t) { force(t); function(p) {
                 bw <- tempfile(fileext = ".bw")
                 on.exit(unlink(bw), add = TRUE)
-                BamScale::bam_coverage_bigwig(p, bw, threads = t, parallel = TRUE, BPPARAM = NULL)
+                BamScaleR::bam_coverage_bigwig(p, bw, threads = t, parallel = TRUE, BPPARAM = NULL)
                 1L
             } },
             std_worker = function() function(p) {
@@ -215,12 +215,12 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
             include = cfg$include_fragsize,
             std_method = "Rsamtools::scanBam(isize) -> fragment-size table",
             std_family = "Rsamtools",
-            pkgs = c("BamScale", "Rsamtools"),
+            pkgs = c("BamScaleR", "Rsamtools"),
             bs_single = function(f, t) .wf_total_only(function()
-                BamScale::fragment_sizes(f, param = fragP, threads = t, BPPARAM = NULL)),
+                BamScaleR::fragment_sizes(f, param = fragP, threads = t, BPPARAM = NULL)),
             std_single = function(f) .wf_atac_single(f, "std", 1L),
             bs_worker = function(t) { force(t); force(fragP); function(p)
-                nrow(BamScale::fragment_sizes(p, param = fragP, threads = t, BPPARAM = NULL)) },
+                nrow(BamScaleR::fragment_sizes(p, param = fragP, threads = t, BPPARAM = NULL)) },
             std_worker = function() { force(FLAG); function(p) {
                 d <- Rsamtools::scanBam(p, param = Rsamtools::ScanBamParam(what = "isize", flag = FLAG))[[1]]
                 length(table(abs(d$isize)))
@@ -230,12 +230,12 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
             include = cfg$include_mapq,
             std_method = "Rsamtools::scanBam(mapq) -> table",
             std_family = "Rsamtools",
-            pkgs = c("BamScale", "Rsamtools"),
+            pkgs = c("BamScaleR", "Rsamtools"),
             bs_single = function(f, t) .wf_total_only(function()
-                BamScale::mapq_dist(f, threads = t, BPPARAM = NULL)),
+                BamScaleR::mapq_dist(f, threads = t, BPPARAM = NULL)),
             std_single = function(f) .wf_mapq_single_std(f),
             bs_worker = function(t) { force(t); function(p)
-                nrow(BamScale::mapq_dist(p, threads = t, BPPARAM = NULL)) },
+                nrow(BamScaleR::mapq_dist(p, threads = t, BPPARAM = NULL)) },
             std_worker = function() function(p) {
                 d <- Rsamtools::scanBam(p, param = Rsamtools::ScanBamParam(what = "mapq"))[[1]]
                 length(table(d$mapq, useNA = "ifany"))
@@ -252,7 +252,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
     tryCatch({
         flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
         ga_std <- GenomicAlignments::readGAlignments(path, param = flt)
-        ga_bs  <- BamScale::bam_read(path, what = c("rname", "pos", "cigar", "strand"),
+        ga_bs  <- BamScaleR::bam_read(path, what = c("rname", "pos", "cigar", "strand"),
                                      as = "GAlignments", threads = 1L, BPPARAM = NULL, param = flt)
         same_levels  <- identical(GenomeInfoDb::seqlevels(ga_std), GenomeInfoDb::seqlevels(ga_bs))
         same_lengths <- identical(GenomeInfoDb::seqlengths(ga_std), GenomeInfoDb::seqlengths(ga_bs))
@@ -272,7 +272,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
     tryCatch({
         FLAG <- .wf_atac_flag()
         std <- Rsamtools::scanBam(path, param = Rsamtools::ScanBamParam(what = "isize", flag = FLAG))[[1]]
-        bs  <- BamScale::bam_read(path, what = "isize", as = "data.frame",
+        bs  <- BamScaleR::bam_read(path, what = "isize", as = "data.frame",
                                   threads = 1L, BPPARAM = NULL,
                                   param = Rsamtools::ScanBamParam(flag = FLAG))
         t_std <- table(abs(std$isize)); t_bs <- table(abs(bs$isize))
@@ -296,7 +296,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
     tryCatch({
         flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
         std <- GenomicAlignments::coverage(GenomicAlignments::readGAlignments(path, param = flt))
-        bs  <- BamScale::bam_coverage(path, threads = 2L, BPPARAM = NULL)
+        bs  <- BamScaleR::bam_coverage(path, threads = 2L, BPPARAM = NULL)
         same_levels  <- identical(names(std), names(bs))
         same_lengths <- identical(vapply(std, length, numeric(1)), vapply(bs, length, numeric(1)))
         same_cov     <- identical(bs, std)
@@ -313,7 +313,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
         flt <- Rsamtools::ScanBamParam(flag = Rsamtools::scanBamFlag(isUnmappedQuery = FALSE))
         bw_bs  <- tempfile(fileext = ".bw"); bw_std <- tempfile(fileext = ".bw")
         on.exit(unlink(c(bw_bs, bw_std)), add = TRUE)
-        BamScale::bam_coverage_bigwig(path, bw_bs, threads = 2L, parallel = TRUE, BPPARAM = NULL)
+        BamScaleR::bam_coverage_bigwig(path, bw_bs, threads = 2L, parallel = TRUE, BPPARAM = NULL)
         cvg <- GenomicAlignments::coverage(GenomicAlignments::readGAlignments(path, param = flt))
         rtracklayer::export.bw(cvg, bw_std)
         # Both files pass through the same importer, so equal values => identical objects.
@@ -337,7 +337,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
         FLAG <- .wf_atac_flag()
         std <- Rsamtools::scanBam(path, param = Rsamtools::ScanBamParam(what = "isize", flag = FLAG))[[1]]
         t_std <- table(abs(std$isize))
-        fs <- BamScale::fragment_sizes(path, param = Rsamtools::ScanBamParam(flag = FLAG),
+        fs <- BamScaleR::fragment_sizes(path, param = Rsamtools::ScanBamParam(flag = FLAG),
                                        threads = 2L, BPPARAM = NULL)
         keys <- union(names(t_std), as.character(fs$fragment_size))
         a <- setNames(as.integer(t_std[keys]), keys); a[is.na(a)] <- 0L
@@ -358,7 +358,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
         # Rsamtools reports MAPQ 255 ("unavailable") as NA; mapq_dist keeps 255.
         nm <- names(t_std); nm[is.na(nm)] <- "255"
         names(t_std) <- nm
-        md <- BamScale::mapq_dist(path, threads = 2L, BPPARAM = NULL)
+        md <- BamScaleR::mapq_dist(path, threads = 2L, BPPARAM = NULL)
         keys <- union(names(t_std), as.character(md$mapq))
         a <- setNames(as.integer(t_std[keys]), keys); a[is.na(a)] <- 0L
         b <- setNames(as.integer(md$count[match(keys, as.character(md$mapq))]), keys)
@@ -413,7 +413,7 @@ source(file.path(.wf_script_dir(), "bench_common.R"))
         threads_requested = meta$threads_requested, threads_effective = meta$threads_effective,
         bp_workers_requested = meta$bp_workers_requested, bp_workers_effective = meta$bp_workers_effective,
         # Total OS cores the arm actually used = OpenMP threads x BiocParallel
-        # workers. Exposes the resource asymmetry the audit flagged (BamScale can
+        # workers. Exposes the resource asymmetry the audit flagged (BamScaleR can
         # use more cores per file than the single-threaded standard reader).
         cores_used = meta$threads_effective * meta$bp_workers_effective,
         n_files = meta$n_files, n_records = meta$n_records, total_mb = meta$total_mb,
@@ -552,10 +552,10 @@ run_single <- function(workload, bams) {
     std_method <- if (identical(workload, "coverage")) "GenomicAlignments::readGAlignments -> coverage -> export.bw"
                   else "Rsamtools::scanBam(isize) -> fragment-size table"
     once_bs  <- function(t) if (identical(workload, "coverage"))
-        function() .wf_cov_single(single, "BamScale", t, cfg$write_bigwig) else function() .wf_atac_single(single, "BamScale", t)
-    # BamScale across the thread grid
+        function() .wf_cov_single(single, "BamScaleR", t, cfg$write_bigwig) else function() .wf_atac_single(single, "BamScaleR", t)
+    # BamScaleR across the thread grid
     for (t in cfg$threads) {
-        meta <- .wf_build_meta("single", workload, "BamScale", "BamScale", t, t, 1L, 1L, 1L, n_rec, mb, "single-file")
+        meta <- .wf_build_meta("single", workload, "BamScaleR", "BamScaleR", t, t, 1L, 1L, 1L, n_rec, mb, "single-file")
         add(.wf_run_case(meta, once_bs(t), cfg$iterations, cfg$warmup))
     }
     # Standard reader once (single-threaded, flat reference)
@@ -570,12 +570,12 @@ run_multi <- function(workload, bams) {
     n_rec <- sum(unname(rec_map[files]), na.rm = TRUE); mb <- sum(unname(mb_map[files]))
     std_family <- if (identical(workload, "coverage")) "GenomicAlignments" else "Rsamtools"
     std_method <- if (identical(workload, "coverage")) "GenomicAlignments + BiocParallel" else "Rsamtools::scanBam + BiocParallel"
-    pkgs <- if (identical(workload, "coverage")) c("BamScale", "GenomicAlignments", "rtracklayer") else c("BamScale", "Rsamtools")
+    pkgs <- if (identical(workload, "coverage")) c("BamScaleR", "GenomicAlignments", "rtracklayer") else c("BamScaleR", "Rsamtools")
     once <- function(engine, threads, bp) if (identical(workload, "coverage"))
         function() .wf_cov_multi(files, engine, threads, bp, cfg$multi_write_bigwig)
         else function() .wf_atac_multi(files, engine, threads, bp)
 
-    # One BamScale + one standard case at (W workers x threads_each / 1). The
+    # One BamScaleR + one standard case at (W workers x threads_each / 1). The
     # PSOCK cluster is started and its reader namespaces pre-loaded OUTSIDE the
     # timed region, so cluster spin-up and per-worker library loading are not
     # charged to every iteration (audit: otherwise they dilute the ratio->1.0).
@@ -587,16 +587,16 @@ run_multi <- function(workload, bams) {
                 for (p in pk) suppressMessages(requireNamespace(p, quietly = TRUE)); TRUE
             }, pk = pkgs, BPPARAM = bp), silent = TRUE)
         }
-        add(.wf_run_case(.wf_build_meta("multi", workload, "BamScale", "BamScale",
+        add(.wf_run_case(.wf_build_meta("multi", workload, "BamScaleR", "BamScaleR",
             threads_each, threads_each, w, w, length(files), n_rec, mb, track),
-            once("BamScale", threads_each, bp), cfg$iterations, cfg$warmup))
+            once("BamScaleR", threads_each, bp), cfg$iterations, cfg$warmup))
         add(.wf_run_case(.wf_build_meta("multi", workload, std_method, std_family,
             1L, 1L, w, w, length(files), n_rec, mb, track),
             once("std", 1L, bp), cfg$iterations, cfg$warmup))
         if (!is.null(bp)) try(BiocParallel::bpstop(bp), silent = TRUE)
     }
 
-    # Full-budget sweep (W>=2): BamScale spends the whole core budget
+    # Full-budget sweep (W>=2): BamScaleR spends the whole core budget
     # (floor(budget/W) threads x W workers ~= budget cores); standard uses W cores
     # (1 thread/worker). cores_used in the output exposes the asymmetry. W=1 is
     # excluded (it is the single-file case, not a multi-file worker point).
@@ -628,7 +628,7 @@ run_single_api <- function(wl, spec, bams) {
     single <- bams[[1]]
     n_rec <- unname(rec_map[single]); mb <- unname(mb_map[single])
     for (t in cfg$threads) {
-        meta <- .wf_build_meta("single", wl, "BamScale", "BamScale", t, t, 1L, 1L, 1L, n_rec, mb, "single-file")
+        meta <- .wf_build_meta("single", wl, "BamScaleR", "BamScaleR", t, t, 1L, 1L, 1L, n_rec, mb, "single-file")
         add(.wf_run_case(meta, function() spec$bs_single(single, t), cfg$iterations, cfg$warmup))
     }
     meta <- .wf_build_meta("single", wl, spec$std_method, spec$std_family, 1L, 1L, 1L, 1L, 1L, n_rec, mb, "single-file")
@@ -674,7 +674,7 @@ run_multi_api <- function(wl, spec, bams) {
             )
             list(total = c(elapsed = master$elapsed, user = master$user, sys = master$sys))
         }
-        add(.wf_run_case(.wf_build_meta("multi", wl, "BamScale", "BamScale",
+        add(.wf_run_case(.wf_build_meta("multi", wl, "BamScaleR", "BamScaleR",
             threads_each, threads_each, w, w, length(files), n_rec, mb, track),
             once(bs_worker), cfg$iterations, cfg$warmup))
         add(.wf_run_case(.wf_build_meta("multi", wl, spec$std_method, spec$std_family,

@@ -178,7 +178,7 @@ test_that("compatible seq/qual builds correctly on fresh SnowParam SOCK workers"
   rs <- Rsamtools::scanBam(bam, param = Rsamtools::ScanBamParam(what = c("seq", "qual")))[[1]]
   bp <- BiocParallel::SnowParam(2L, type = "SOCK")
   res <- BiocParallel::bplapply(1:2, function(i) {
-    x <- BamScale::bam_read(bam, what = c("seq", "qual"), as = "data.frame", threads = 1)
+    x <- BamScaleR::bam_read(bam, what = c("seq", "qual"), as = "data.frame", threads = 1)
     list(seq = as.character(x$seq), qual = as.character(x$qual),
          seq_cls = class(x$seq), qual_cls = class(x$qual))
   }, BPPARAM = bp)
@@ -496,7 +496,7 @@ test_that("GA fast path and slow path produce identical objects", {
   bam <- ompBAM::example_BAM("Unsorted")
   fields <- c("rname", "pos", "cigar", "strand", "flag", "mapq")
   fast <- bam_read(bam, what = fields, as = "GAlignments", threads = 2)
-  old <- options(BamScale.ga_fastpath = FALSE)
+  old <- options(BamScaleR.ga_fastpath = FALSE)
   on.exit(options(old), add = TRUE)
   slow <- bam_read(bam, what = fields, as = "GAlignments", threads = 2)
   expect_identical(fast, slow)
@@ -569,7 +569,7 @@ test_that("GAlignments carries header seqlengths and gives identical coverage()"
 
 test_that("auto_threads validates logical input", {
   expect_error(
-    BamScale:::.bamscale_resolve_parallel_plan(threads = 1L, auto_threads = NA),
+    BamScaleR:::.bamscale_resolve_parallel_plan(threads = 1L, auto_threads = NA),
     "`auto_threads` must be TRUE or FALSE"
   )
 })
@@ -585,14 +585,14 @@ test_that("auto_threads preserves per-file threads by reducing active workers fi
   }
   on.exit(try(BiocParallel::bpstop(bp), silent = TRUE), add = TRUE)
 
-  plan <- BamScale:::.bamscale_resolve_parallel_plan(
+  plan <- BamScaleR:::.bamscale_resolve_parallel_plan(
     threads = 64L,
     BPPARAM = bp,
     auto_threads = TRUE,
     n_files = 8L
   )
 
-  expected_threads <- max(1L, min(64L, BamScale:::.bamscale_detect_cores()))
+  expected_threads <- max(1L, min(64L, BamScaleR:::.bamscale_detect_cores()))
   expect_equal(plan$threads, expected_threads)
   expect_equal(plan$bp_workers, 1L)
 })
@@ -608,21 +608,21 @@ test_that("auto_threads keeps multiple workers when requested per-file threads a
   }
   on.exit(try(BiocParallel::bpstop(bp), silent = TRUE), add = TRUE)
 
-  plan <- BamScale:::.bamscale_resolve_parallel_plan(
+  plan <- BamScaleR:::.bamscale_resolve_parallel_plan(
     threads = 2L,
     BPPARAM = bp,
     auto_threads = TRUE,
     n_files = 8L
   )
 
-  workers_eff <- min(BamScale:::.bamscale_bpparam_workers(bp), 8L)
+  workers_eff <- min(BamScaleR:::.bamscale_bpparam_workers(bp), 8L)
   expected_workers <- min(
     workers_eff,
-    max(1L, floor(BamScale:::.bamscale_detect_cores() / 2L))
+    max(1L, floor(BamScaleR:::.bamscale_detect_cores() / 2L))
   )
   expect_equal(plan$threads, 2L)
   expect_equal(plan$bp_workers, expected_workers)
-  expect_lte(plan$threads * plan$bp_workers, max(1L, BamScale:::.bamscale_detect_cores()))
+  expect_lte(plan$threads * plan$bp_workers, max(1L, BamScaleR:::.bamscale_detect_cores()))
 })
 
 test_that("compact decode helpers decode synthetic seq and qual correctly", {
@@ -691,7 +691,7 @@ test_that("decode_seqqual_compact preserves non-seqqual columns", {
   expect_identical(y$qual, "!\"#$")
 })
 
-test_that("compact seqqual round-trips to BamScale compatible output", {
+test_that("compact seqqual round-trips to BamScaleR compatible output", {
   bam <- ompBAM::example_BAM("Unsorted")
 
   compat <- bam_read(

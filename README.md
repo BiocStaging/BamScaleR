@@ -1,41 +1,41 @@
-# BamScale <a href="https://cparsania.github.io/BamScale"><img src="man/figures/logo.png" align="right" height="240" alt="BamScale website" /></a>
+# BamScaleR <a href="https://cparsania.github.io/BamScaleR"><img src="man/figures/logo.png" align="right" height="240" alt="BamScaleR website" /></a>
 
 > Bioconductor-friendly multithreaded BAM processing
 
 <!-- versions -->
-[![GitHub version](https://img.shields.io/github/r-package/v/cparsania/BamScale?label=GitHub&logo=github&color=blue)](https://github.com/cparsania/BamScale)
-[![Bioc devel version](https://bioc.r-universe.dev/badges/BamScale?label=Bioc%20devel)](https://bioconductor.org/packages/3.24/bioc/html/BamScale.html)
-[![Bioc release](https://img.shields.io/badge/Bioc%20release-upcoming%20(3.24)-orange)](https://bioconductor.org/packages/3.24/bioc/html/BamScale.html)
+[![GitHub version](https://img.shields.io/github/r-package/v/cparsania/BamScaleR?label=GitHub&logo=github&color=blue)](https://github.com/cparsania/BamScaleR)
+[![Bioc devel version](https://bioc.r-universe.dev/badges/BamScaleR?label=Bioc%20devel)](https://bioconductor.org/packages/3.24/bioc/html/BamScaleR.html)
+[![Bioc release](https://img.shields.io/badge/Bioc%20release-upcoming%20(3.24)-orange)](https://bioconductor.org/packages/3.24/bioc/html/BamScaleR.html)
 <!-- checks -->
-[![R-CMD-check](https://github.com/cparsania/BamScale/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/cparsania/BamScale/actions/workflows/R-CMD-check.yaml)
-[![Bioc build](https://bioconductor.org/shields/build/devel/bioc/BamScale.svg)](https://bioconductor.org/checkResults/devel/bioc-LATEST/BamScale/)
-[![pkgdown](https://github.com/cparsania/BamScale/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/cparsania/BamScale/actions/workflows/pkgdown.yaml)
+[![R-CMD-check](https://github.com/cparsania/BamScaleR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/cparsania/BamScaleR/actions/workflows/R-CMD-check.yaml)
+[![Bioc build](https://bioconductor.org/shields/build/devel/bioc/BamScaleR.svg)](https://bioconductor.org/checkResults/devel/bioc-LATEST/BamScaleR/)
+[![pkgdown](https://github.com/cparsania/BamScaleR/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/cparsania/BamScaleR/actions/workflows/pkgdown.yaml)
 <!-- status -->
-[![Bioconductor availability](https://bioconductor.org/shields/availability/devel/BamScale.svg)](https://bioconductor.org/packages/3.24/bioc/html/BamScale.html)
-[![Bioc downloads](https://bioconductor.org/shields/downloads/devel/BamScale.svg)](https://bioconductor.org/packages/stats/bioc/BamScale/)
+[![Bioconductor availability](https://bioconductor.org/shields/availability/devel/BamScaleR.svg)](https://bioconductor.org/packages/3.24/bioc/html/BamScaleR.html)
+[![Bioc downloads](https://bioconductor.org/shields/downloads/devel/BamScaleR.svg)](https://bioconductor.org/packages/stats/bioc/BamScaleR/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**BamScale** is a multithreaded BAM reader for R, built on the [`ompBAM`](https://bioconductor.org/packages/ompBAM) OpenMP engine. It returns the *exact* Bioconductor objects you already use — verified **byte-identical** to `Rsamtools` and `GenomicAlignments` — but decodes each file across many cores, taking the read step off the critical path in alignment-centric workflows.
+**BamScaleR** is a multithreaded BAM reader for R, built on the [`ompBAM`](https://bioconductor.org/packages/ompBAM) OpenMP engine. It returns the *exact* Bioconductor objects you already use — verified **byte-identical** to `Rsamtools` and `GenomicAlignments` — but decodes each file across many cores, taking the read step off the critical path in alignment-centric workflows.
 
 - **2.5–4× faster** single-file reads than `scanBam` / `readGAlignments`
 - **Drop-in**: same objects, same `ScanBamParam` filtering, same `BiocParallel` model
-- **In-reader aggregation** (0.99.14): `fragment_sizes()`, `mapq_dist()`, `bam_coverage()`, and single-pass `bam_coverage_bigwig()` fold the computation inside the reader — byte-identical results without materialising per-read objects
+- **In-reader aggregation**: `fragment_sizes()`, `mapq_dist()`, `bam_coverage()`, and single-pass `bam_coverage_bigwig()` fold the computation inside the reader — byte-identical results without materialising per-read objects
 - **Two parallel axes**: OpenMP `threads` *within* a file, `BiocParallel` *across* files
 - **Verified correct**: output is byte-identical to the standard tools at every thread count
 
 ## Benchmarks
 
-Intel Xeon Gold 6252 (96 cores), warm page cache, median of 5 iterations. Full methodology, figures, and fair-comparison details are in the [benchmark article](https://cparsania.github.io/BamScale/articles/benchmark-results.html).
+Intel Xeon Gold 6252 (96 cores), warm page cache, median of 5 iterations. Full methodology, figures, and fair-comparison details are in the [benchmark article](https://cparsania.github.io/BamScaleR/articles/benchmark-results.html).
 
-**Single-file read throughput** — best BamScale configuration vs the single-threaded standard reader:
+**Single-file read throughput** — best BamScaleR configuration vs the single-threaded standard reader:
 
-| Read pattern | Comparator | Standard | BamScale | Threads | Speedup |
+| Read pattern | Comparator | Standard | BamScaleR | Threads | Speedup |
 | --- | --- | ---: | ---: | :---: | :---: |
 | Core alignment fields | `Rsamtools::scanBam` | 15.4 s | 6.3 s | 48 | **2.5×** |
 | `GAlignments` object | `GenomicAlignments::readGAlignments` | 10.6 s | 2.6 s | 48 | **4.0×** |
 | Sequence + base quality | `Rsamtools::scanBam` | 21.6 s | 7.0 s | 48 | **3.1×** |
 
-**End-to-end workflows** — BamScale swapped in for the read step only, every other step identical on both sides. The gain tracks how read-bound the workflow is (Amdahl's law):
+**End-to-end workflows** — BamScaleR swapped in for the read step only, every other step identical on both sides. The gain tracks how read-bound the workflow is (Amdahl's law):
 
 | Workflow | Read fraction | End-to-end speedup |
 | --- | :---: | :---: |
@@ -45,30 +45,30 @@ Intel Xeon Gold 6252 (96 cores), warm page cache, median of 5 iterations. Full m
 
 Every result is measured against output verified equal to the standard tool: the ATAC fragment-size table is byte-identical to `ATACseqQC::fragSizeDist` across 49.8M reads, and the coverage `RleList` is `identical()` to `GenomicAlignments::coverage()` at every thread count.
 
-> BamScale is not a raw-decode replacement for command-line `samtools`. Its job is fast, object-faithful decoding *inside* R — putting the cores a single-threaded reader leaves idle to work, and handing back the precise Bioconductor objects your analysis depends on.
+> BamScaleR is not a raw-decode replacement for command-line `samtools`. Its job is fast, object-faithful decoding *inside* R — putting the cores a single-threaded reader leaves idle to work, and handing back the precise Bioconductor objects your analysis depends on.
 
 ## Installation
 
 Requires R with a C++17 toolchain and an OpenMP-capable compiler; `ompBAM` and the other dependencies are pulled in automatically.
 
-BamScale is on [Bioconductor](https://bioconductor.org/packages/3.24/bioc/html/BamScale.html) (currently in the `devel` branch):
+BamScaleR is on [Bioconductor](https://bioconductor.org/packages/3.24/bioc/html/BamScaleR.html) (currently in the `devel` branch):
 
 ```r
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(version = "devel")
-BiocManager::install("BamScale")
+BiocManager::install("BamScaleR")
 ```
 
 Or install the development version from GitHub:
 
 ```r
-remotes::install_github("cparsania/BamScale")
+remotes::install_github("cparsania/BamScaleR")
 ```
 
 ## Quick start
 
 ```r
-library(BamScale)
+library(BamScaleR)
 
 bam <- ompBAM::example_BAM("Unsorted")
 
@@ -98,7 +98,7 @@ sq <- bam_read(
 # Fast chromosome-level counts
 cnt <- bam_count(bam, threads = 4)
 
-# In-reader aggregation (0.99.14): summaries computed inside the C++ reader,
+# In-reader aggregation: summaries computed inside the C++ reader,
 # byte-identical to the scanBam/coverage equivalents
 fs  <- fragment_sizes(bam, threads = 4)   # paired-end fragment-size distribution
 mq  <- mapq_dist(bam, threads = 4)        # mapping-quality distribution
@@ -108,7 +108,7 @@ bam_coverage_bigwig(bam, "coverage.bw", threads = 4)  # single-pass BAM -> bigWi
 
 ## Output modes & compatibility
 
-BamScale fits where `Rsamtools` and `GenomicAlignments` already fit, adding a within-file threading axis on top:
+BamScaleR fits where `Rsamtools` and `GenomicAlignments` already fit, adding a within-file threading axis on top:
 
 - **Field extraction** via `what = c("qname", "flag", "rname", "pos", "mapq", "cigar", ...)` — the metadata pattern behind most QC, filtering, and fragment-level summaries.
 - **Alignment objects** via `as = "GAlignments"` or `as = "GAlignmentPairs"`.
@@ -118,13 +118,13 @@ BamScale fits where `Rsamtools` and `GenomicAlignments` already fit, adding a wi
 
 ## Parallelism model
 
-BamScale parallelizes on two axes — across files via `BPPARAM` workers, and within each file via OpenMP `threads`. Approximate effective concurrency:
+BamScaleR parallelizes on two axes — across files via `BPPARAM` workers, and within each file via OpenMP `threads`. Approximate effective concurrency:
 
 ```
 min(length(files), bpnworkers(BPPARAM)) * threads
 ```
 
-With `auto_threads = TRUE`, BamScale keeps per-file thread counts high when possible — reducing the number of concurrently active file workers before it shrinks per-file threads. Within-file threading is the key difference from the baseline model, and the reason BamScale removes the read bottleneck when there are fewer files than cores.
+With `auto_threads = TRUE`, BamScaleR keeps per-file thread counts high when possible — reducing the number of concurrently active file workers before it shrinks per-file threads. Within-file threading is the key difference from the baseline model, and the reason BamScaleR removes the read bottleneck when there are fewer files than cores.
 
 ## Sequence/quality: `compatible` vs `compact`
 
@@ -161,10 +161,10 @@ Benchmark drivers and reporting assets ship under [inst/benchmarks/](inst/benchm
 ## Citation
 
 ```r
-citation("BamScale")
+citation("BamScaleR")
 ```
 
-If BamScale contributes to a performance claim, please also cite `ompBAM`.
+If BamScaleR contributes to a performance claim, please also cite `ompBAM`.
 
 ## Contributing
 
@@ -172,14 +172,14 @@ Pull requests are welcome — please include a short motivation, tests for behav
 
 ```bash
 R CMD build .
-R CMD check --as-cran BamScale_*.tar.gz
+R CMD check --as-cran BamScaleR_*.tar.gz
 Rscript -e "BiocCheck::BiocCheck('.')"
 ```
 
 ## Community & support
 
 - User questions: [Bioconductor support site](https://support.bioconductor.org)
-- Bugs & feature requests: [GitHub issues](https://github.com/cparsania/BamScale/issues)
+- Bugs & feature requests: [GitHub issues](https://github.com/cparsania/BamScaleR/issues)
 
 ## License
 

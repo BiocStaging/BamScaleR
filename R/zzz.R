@@ -1,5 +1,5 @@
 #' @keywords internal
-#' @useDynLib BamScale, .registration = TRUE
+#' @useDynLib BamScaleR, .registration = TRUE
 #' @import methods
 #' @importFrom BiocParallel bplapply bpnworkers bpworkers bpparam
 #' @importFrom BiocGenerics path unlist
@@ -21,8 +21,8 @@
     # GenomicAlignments must be loaded for the same reason: the GAlignments /
     # GAlignmentPairs output path builds objects via methods::new("GAlignments"),
     # which fails with "'GAlignments' is not a defined class" unless the class is
-    # registered. BamScale reaches GenomicAlignments only via `::`, so loading
-    # BamScale alone does not register the class in the current (or a worker)
+    # registered. BamScaleR reaches GenomicAlignments only via `::`, so loading
+    # BamScaleR alone does not register the class in the current (or a worker)
     # process.
     for (pkg in c("S4Vectors", "IRanges", "XVector", "Biostrings", "GenomicAlignments")) {
         requireNamespace(pkg, quietly = TRUE)

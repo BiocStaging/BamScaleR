@@ -70,7 +70,7 @@ more than one BAM. Defaults to \code{BiocParallel::bpparam()}. Set to \code{NULL
 to force serial file processing.}
 
 \item{auto_threads}{Logical; when \code{TRUE} and \code{BPPARAM} has multiple workers,
-BamScale adaptively avoids oversubscription by preserving higher
+BamScaleR adaptively avoids oversubscription by preserving higher
 per-file OpenMP thread counts when possible and reducing the number of
 concurrently active file workers before shrinking per-file threads.}
 
@@ -105,7 +105,7 @@ Parallelism model:
 \item \code{threads} parallelizes within each file via OpenMP.
 \item Effective total concurrency is approximately
 \code{min(length(file), BiocParallel::bpnworkers(BPPARAM)) * threads}.
-\item If \code{auto_threads = TRUE} and \code{BPPARAM} has multiple workers, BamScale
+\item If \code{auto_threads = TRUE} and \code{BPPARAM} has multiple workers, BamScaleR
 first limits the number of concurrently active workers to preserve the
 requested per-file thread count within the detected core budget, then
 caps per-file OpenMP threads only if a single file would still
