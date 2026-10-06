@@ -1,4 +1,4 @@
-# BamScale benchmark harness
+# BamScaleR benchmark harness
 
 This folder holds two complementary, budget-aware benchmark drivers and the
 assets used to summarise their results. Nothing here is loaded at package run
@@ -22,7 +22,7 @@ in `vignettes/benchmark-results.Rmd` (the pkgdown "Benchmarks" article).
 ## Headline results
 
 Intel Xeon Gold 6252 (96 cores), warm page cache, median of 5 iterations. All
-BamScale output is verified byte-identical to the standard tool.
+BamScaleR output is verified byte-identical to the standard tool.
 
 | Workload | Comparator | Speedup |
 | --- | --- | :--: |
@@ -48,8 +48,8 @@ Rscript inst/benchmarks/run_server_benchmark.R \
 
 If no `--bam-dir` is given, BAMs are resolved from `chipseqDBData::H3K9acData()`.
 
-**Tracks.** `fair` = comparator-safe runs used for BamScale vs
-Rsamtools/GenomicAlignments comparisons; `optimized` = BamScale-only runs
+**Tracks.** `fair` = comparator-safe runs used for BamScaleR vs
+Rsamtools/GenomicAlignments comparisons; `optimized` = BamScaleR-only runs
 (compact `seq/qual`). Report sections that claim cross-package comparison use
 only the `fair` track.
 
@@ -58,7 +58,7 @@ only the `fair` track.
 
 **Budget model.** `--budget-threads` is the total compute budget
 (`min(48, cores)` for showcase/balanced, `cores` for `full`); `--max-threads`
-is the per-run thread ceiling. Multi-file BamScale uses a balanced split:
+is the per-run thread ceiling. Multi-file BamScaleR uses a balanced split:
 `threads_each = floor(max_threads / workers)`, so total ≈ `workers * threads_each`.
 
 **Useful options:** `--profile`, `--budget-threads`, `--max-threads`,
@@ -69,7 +69,7 @@ is the per-run thread ceiling. Multi-file BamScale uses a balanced split:
 
 ## End-to-end workflow benchmarks — `run_workflow_benchmark.R`
 
-BamScale replaces exactly the BAM-read step of each workflow; the compute and
+BamScaleR replaces exactly the BAM-read step of each workflow; the compute and
 write steps are byte-identical work on both arms. Single-file cases sweep the
 OpenMP thread axis with full per-phase timing; multi-file cases sweep the
 `BiocParallel` worker axis at a fixed core budget.

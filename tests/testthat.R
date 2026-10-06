@@ -1,4 +1,4 @@
 library(testthat)
-library(BamScale)
+library(BamScaleR)
 
-test_check("BamScale")
+test_check("BamScaleR")

@@ -41,6 +41,14 @@ for mapping-quality QC on large BAMs: each thread tallies MAPQ into a private
 \verb{(mapq, count)} table crosses back into R (cf. \code{scanBam(what = "mapq")}
 followed by \code{table(mapq)}, which materialises every MAPQ in R first).
 }
+\examples{
+bam <- ompBAM::example_BAM("Unsorted")
+
+# Mapping-quality distribution computed inside the reader
+mq <- mapq_dist(bam, threads = 2)
+head(mq)
+
+}
 \seealso{
 \code{\link[=fragment_sizes]{fragment_sizes()}} for the fragment-size distribution, \code{\link[=bam_count]{bam_count()}}
 for per-chromosome counts.

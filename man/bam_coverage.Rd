@@ -50,6 +50,14 @@ and \code{I}/\code{S}/\code{H}/\code{P} are ignored; only unmapped reads (SAM fl
 dropped by default -- secondary, supplementary, duplicate and QC-fail reads are
 counted, exactly as \code{readGAlignments()} does.
 }
+\examples{
+bam <- ompBAM::example_BAM("Unsorted")
+
+# Per-base coverage as an RleList, with no alignments materialised in R
+cov <- bam_coverage(bam, threads = 2)
+cov[1]
+
+}
 \seealso{
 \code{\link[=fragment_sizes]{fragment_sizes()}}, \code{\link[=mapq_dist]{mapq_dist()}}, \code{\link[=bam_read]{bam_read()}}.
 }

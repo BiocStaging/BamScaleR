@@ -69,7 +69,7 @@
 #'   more than one BAM. Defaults to `BiocParallel::bpparam()`. Set to `NULL`
 #'   to force serial file processing.
 #' @param auto_threads Logical; when `TRUE` and `BPPARAM` has multiple workers,
-#'   BamScale adaptively avoids oversubscription by preserving higher
+#'   BamScaleR adaptively avoids oversubscription by preserving higher
 #'   per-file OpenMP thread counts when possible and reducing the number of
 #'   concurrently active file workers before shrinking per-file threads.
 #' @param use.names Passed to alignment object conversion. When `TRUE`, read names
@@ -94,7 +94,7 @@
 #' - `threads` parallelizes within each file via OpenMP.
 #' - Effective total concurrency is approximately
 #'   `min(length(file), BiocParallel::bpnworkers(BPPARAM)) * threads`.
-#' - If `auto_threads = TRUE` and `BPPARAM` has multiple workers, BamScale
+#' - If `auto_threads = TRUE` and `BPPARAM` has multiple workers, BamScaleR
 #'   first limits the number of concurrently active workers to preserve the
 #'   requested per-file thread count within the detected core budget, then
 #'   caps per-file OpenMP threads only if a single file would still
@@ -225,18 +225,18 @@ bam_read <- function(
     # Fast path: assemble the GAlignments slots in C++ (no data.frame
     # intermediate, no R-side Rle/subset work, CHARSXP-cached cigar). Taken for
     # plain GAlignments requests; `which`, which_label, tags and seq/qual fall
-    # back to the generic path. Escape hatch: options(BamScale.ga_fastpath = FALSE).
+    # back to the generic path. Escape hatch: options(BamScaleR.ga_fastpath = FALSE).
     ga_fastpath <- identical(as, "GAlignments") &&
         nrow(parsed$which) == 0L &&
         !isTRUE(internal_with_which_label) &&
         length(tag_final) == 0L &&
         !include_seq && !include_qual &&
-        !identical(getOption("BamScale.ga_fastpath", TRUE), FALSE)
+        !identical(getOption("BamScaleR.ga_fastpath", TRUE), FALSE)
 
     worker <- function(path_one) {
         if (ga_fastpath) {
             payload <- .Call(
-                `_BamScale_galignments_cpp`,
+                `_BamScaleR_galignments_cpp`,
                 path_one,
                 threads,
                 as.integer(parsed$min_mapq),
@@ -247,7 +247,7 @@ bam_read <- function(
             return(.bamscale_ga_from_payload(payload, what_final, use.names))
         }
         raw_df <- .Call(
-            `_BamScale_read_bam_cpp`,
+            `_BamScaleR_read_bam_cpp`,
             path_one,
             threads,
             as.integer(parsed$min_mapq),
@@ -320,7 +320,7 @@ bam_read <- function(
 #'   to `BiocParallel::bpparam()`. Set to `NULL` to force serial file
 #'   processing.
 #' @param auto_threads Logical; when `TRUE` and `BPPARAM` has multiple workers,
-#'   BamScale adaptively avoids oversubscription by preserving higher
+#'   BamScaleR adaptively avoids oversubscription by preserving higher
 #'   per-file OpenMP thread counts when possible and reducing the number of
 #'   concurrently active file workers before shrinking per-file threads.
 #' @param include_unmapped Whether to include an extra `*` row for unmapped
@@ -333,7 +333,7 @@ bam_read <- function(
 #' @details
 #' Parallelism behavior matches `bam_read()`: `BPPARAM` distributes work across
 #' BAM files, while `threads` controls OpenMP work within each file. If
-#' `auto_threads = TRUE` and `BPPARAM` has multiple workers, BamScale first
+#' `auto_threads = TRUE` and `BPPARAM` has multiple workers, BamScaleR first
 #' limits the number of concurrently active workers to preserve the requested
 #' per-file thread count within the detected core budget, then caps per-file
 #' OpenMP threads only if a single file would still oversubscribe the machine.
@@ -362,7 +362,7 @@ bam_count <- function(
 
     worker <- function(path_one) {
         .Call(
-            `_BamScale_count_bam_cpp`,
+            `_BamScaleR_count_bam_cpp`,
             path_one,
             threads,
             as.integer(parsed$min_mapq),
@@ -421,6 +421,13 @@ bam_count <- function(
 #'
 #' @seealso [bam_read()] for reading records, [bam_count()] for per-chromosome
 #'   counts.
+#' @examples
+#' bam <- ompBAM::example_BAM("Unsorted")
+#'
+#' # Fragment-size (insert-size) distribution computed inside the reader
+#' fs <- fragment_sizes(bam, threads = 2)
+#' head(fs)
+#'
 #' @export
 fragment_sizes <- function(
     file,
@@ -443,7 +450,7 @@ fragment_sizes <- function(
 
     worker <- function(path_one) {
         .Call(
-            `_BamScale_fragment_sizes_cpp`,
+            `_BamScaleR_fragment_sizes_cpp`,
             path_one,
             threads,
             as.integer(parsed$min_mapq),
@@ -488,6 +495,13 @@ fragment_sizes <- function(
 #'
 #' @seealso [fragment_sizes()] for the fragment-size distribution, [bam_count()]
 #'   for per-chromosome counts.
+#' @examples
+#' bam <- ompBAM::example_BAM("Unsorted")
+#'
+#' # Mapping-quality distribution computed inside the reader
+#' mq <- mapq_dist(bam, threads = 2)
+#' head(mq)
+#'
 #' @export
 mapq_dist <- function(
     file,
@@ -508,7 +522,7 @@ mapq_dist <- function(
 
     worker <- function(path_one) {
         .Call(
-            `_BamScale_mapq_dist_cpp`,
+            `_BamScaleR_mapq_dist_cpp`,
             path_one,
             threads,
             as.integer(parsed$min_mapq),
@@ -576,6 +590,13 @@ mapq_dist <- function(
 #'   files, a named list of such `RleList`s.
 #'
 #' @seealso [fragment_sizes()], [mapq_dist()], [bam_read()].
+#' @examples
+#' bam <- ompBAM::example_BAM("Unsorted")
+#'
+#' # Per-base coverage as an RleList, with no alignments materialised in R
+#' cov <- bam_coverage(bam, threads = 2)
+#' cov[1]
+#'
 #' @export
 bam_coverage <- function(
     file,
@@ -596,7 +617,7 @@ bam_coverage <- function(
 
     worker <- function(path_one) {
         raw <- .Call(
-            `_BamScale_bam_coverage_cpp`,
+            `_BamScaleR_bam_coverage_cpp`,
             path_one,
             threads,
             as.integer(parsed$min_mapq),
@@ -657,6 +678,14 @@ bam_coverage <- function(
 #' @return The output path(s), invisibly.
 #'
 #' @seealso [bam_coverage()] for the in-memory `RleList`.
+#' @examples
+#' bam <- ompBAM::example_BAM("Unsorted")
+#'
+#' # Single pass from BAM to a finished bigWig track
+#' out <- tempfile(fileext = ".bw")
+#' bam_coverage_bigwig(bam, out, threads = 2)
+#' file.exists(out)
+#'
 #' @export
 bam_coverage_bigwig <- function(
     file,
@@ -686,7 +715,7 @@ bam_coverage_bigwig <- function(
 
     worker <- function(i) {
         .Call(
-            `_BamScale_bam_coverage_bigwig_cpp`,
+            `_BamScaleR_bam_coverage_bigwig_cpp`,
             files[[i]],
             outfile[[i]],
             threads,
@@ -711,13 +740,13 @@ bam_coverage_bigwig <- function(
     invisible(paths)
 }
 
-#' Decode compact BamScale sequence output
+#' Decode compact BamScaleR sequence output
 #'
 #' Decodes `seq` values returned by `bam_read(..., seqqual_mode = "compact")`
 #' back to ordinary character strings.
 #'
 #' @param seq A list (or list-column) of `raw` vectors produced by compact
-#'   BamScale sequence extraction.
+#'   BamScaleR sequence extraction.
 #' @param qwidth Integer vector of read widths. This is required because compact
 #'   sequence bytes use BAM's 4-bit packed encoding (two bases per byte).
 #'
@@ -733,7 +762,7 @@ bam_coverage_bigwig <- function(
 #' @export
 decode_compact_seq <- function(seq, qwidth) {
     if (!is.list(seq)) {
-        stop("`seq` must be a list of raw vectors from compact BamScale output", call. = FALSE)
+        stop("`seq` must be a list of raw vectors from compact BamScaleR output", call. = FALSE)
     }
     qwidth <- as.integer(qwidth)
     if (length(seq) != length(qwidth)) {
@@ -742,16 +771,16 @@ decode_compact_seq <- function(seq, qwidth) {
     decode_compact_seq_cpp(seq, qwidth)
 }
 
-#' Decode compact BamScale quality output
+#' Decode compact BamScaleR quality output
 #'
 #' Decodes `qual` values returned by `bam_read(..., seqqual_mode = "compact")`
 #' back to ASCII Phred-quality strings.
 #'
 #' @param qual A list (or list-column) of `raw` vectors produced by compact
-#'   BamScale quality extraction.
+#'   BamScaleR quality extraction.
 #'
 #' @return A character vector containing decoded quality strings. Entries with
-#'   all-missing quality bytes are returned as `"*"`, matching BamScale's
+#'   all-missing quality bytes are returned as `"*"`, matching BamScaleR's
 #'   compatibility mode.
 #'
 #' @seealso [decode_compact_seq()], [decode_seqqual_compact()], [bam_read()]
@@ -763,18 +792,18 @@ decode_compact_seq <- function(seq, qwidth) {
 #' @export
 decode_compact_qual <- function(qual) {
     if (!is.list(qual)) {
-        stop("`qual` must be a list of raw vectors from compact BamScale output", call. = FALSE)
+        stop("`qual` must be a list of raw vectors from compact BamScaleR output", call. = FALSE)
     }
     decode_compact_qual_cpp(qual)
 }
 
-#' Decode compact `seq` and `qual` columns in BamScale output
+#' Decode compact `seq` and `qual` columns in BamScaleR output
 #'
 #' Convenience wrapper for converting a compact `bam_read()` result back to
 #' ordinary sequence and quality strings.
 #'
 #' @param x A `data.frame`, `S4Vectors::DataFrame`, or list-like object
-#'   containing compact BamScale `seq` and/or `qual` columns.
+#'   containing compact BamScaleR `seq` and/or `qual` columns.
 #' @param seq_col Name of the compact sequence column.
 #' @param qual_col Name of the compact quality column.
 #' @param qwidth_col Name of the read-width column used to decode compact

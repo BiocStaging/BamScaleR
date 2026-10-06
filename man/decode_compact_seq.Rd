@@ -2,13 +2,13 @@
 % Please edit documentation in R/bam_read.R
 \name{decode_compact_seq}
 \alias{decode_compact_seq}
-\title{Decode compact BamScale sequence output}
+\title{Decode compact BamScaleR sequence output}
 \usage{
 decode_compact_seq(seq, qwidth)
 }
 \arguments{
 \item{seq}{A list (or list-column) of \code{raw} vectors produced by compact
-BamScale sequence extraction.}
+BamScaleR sequence extraction.}
 
 \item{qwidth}{Integer vector of read widths. This is required because compact
 sequence bytes use BAM's 4-bit packed encoding (two bases per byte).}

@@ -1,4 +1,4 @@
-url: https://cparsania.github.io/BamScale/
+url: https://cparsania.github.io/BamScaleR/
 template:
   bootstrap: 5
 
@@ -6,5 +6,5 @@ articles:
   - title: Articles
     navbar: Articles
     contents:
-      - BamScale-intro
+      - BamScaleR-intro
       - benchmark-results

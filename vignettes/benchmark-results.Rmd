@@ -1,11 +1,11 @@
 ---
-title: "Benchmarking BamScale: reader throughput and end-to-end workflow impact"
+title: "Benchmarking BamScaleR: reader throughput and end-to-end workflow impact"
 output:
   BiocStyle::html_document:
     toc: true
     toc_depth: 2
 vignette: >
-  %\VignetteIndexEntry{Benchmarking BamScale: reader throughput and end-to-end workflow impact}
+  %\VignetteIndexEntry{Benchmarking BamScaleR: reader throughput and end-to-end workflow impact}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -18,7 +18,7 @@ has_ggplot <- requireNamespace("ggplot2", quietly = TRUE)
 
 ## Overview
 
-`BamScale` is a multithreaded BAM reader, built on the `ompBAM` OpenMP engine, that
+`BamScaleR` is a multithreaded BAM reader, built on the `ompBAM` OpenMP engine, that
 returns the same native Bioconductor objects as the standard readers and is a
 drop-in replacement for `Rsamtools::scanBam` and
 `GenomicAlignments::readGAlignments`.
@@ -27,7 +27,7 @@ Reading a BAM is only one step of an analysis, so a faster reader speeds a workf
 end-to-end **only in proportion to the time that workflow spends reading**
 (Amdahl's law). This vignette summarises benchmarks that quantify *both* the raw
 read speedup and its end-to-end effect on two standard workflows — coverage/bigWig
-track generation and ATAC-seq fragment-size QC — with BamScale output verified
+track generation and ATAC-seq fragment-size QC — with BamScaleR output verified
 **byte-identical** to the standard tools.
 
 The numbers below are a concise summary of a representative benchmark run
@@ -37,13 +37,13 @@ benchmark harness that produces them is in `inst/benchmarks/`
 reproduce the full results.
 
 ```{r results-data}
-## Summary results (benchmark run 2026-08-10, BamScale 0.99.14; see
+## Summary results (benchmark run 2026-08-10, BamScale 0.99.14 -- the predecessor of this package; see
 ## inst/benchmarks/ to reproduce).
 read_tbl <- data.frame(
   Workload    = c("Core fields", "GAlignments", "Sequence + quality"),
   Reads       = c("qname/flag/rname/pos/mapq/cigar", "-> GAlignments object", "seq + base quality"),
   `Standard (s)` = c(15.4, 10.6, 21.6),
-  `BamScale (s)` = c(6.3, 2.6, 7.0),
+  `BamScaleR (s)` = c(6.3, 2.6, 7.0),
   Threads     = c(48L, 48L, 48L),
   Speedup     = c(2.45, 4.03, 3.09),
   check.names = FALSE
@@ -61,14 +61,14 @@ spectrum_tbl <- data.frame(
 
 ## Read throughput on a single large BAM
 
-On a single large BAM, BamScale reads **2.5--4x faster** than the standard reader
+On a single large BAM, BamScaleR reads **2.5--4x faster** than the standard reader
 across three representative access patterns, because it spreads the BGZF decode
 across cores and assembles the output objects in native code:
 
 ```{r read-table}
 knitr::kable(
   transform(read_tbl, Speedup = sprintf("%.2fx", Speedup)),
-  caption = "Single-file read throughput: best BamScale configuration vs the single-threaded standard reader (median of 5 iterations)."
+  caption = "Single-file read throughput: best BamScaleR configuration vs the single-threaded standard reader (median of 5 iterations)."
 )
 ```
 
@@ -85,19 +85,19 @@ ggplot(read_tbl, aes(stats::reorder(Workload, Speedup), Speedup)) +
   theme_minimal(base_size = 12)
 ```
 
-Two honest points. At **one thread** BamScale is modestly faster than the
+Two honest points. At **one thread** BamScaleR is modestly faster than the
 single-threaded readers (about 1.1--1.3x, from native-code object assembly); most
 of the win comes from threading, and the scaling is **strongly sublinear** --
 roughly 2.5--4x on 48 threads, largely saturating between 24 and 48 threads. The
 value is not near-linear scaling but the ability to use cores that a
 single-threaded reader cannot use at all -- as on one large BAM in an interactive
 session. Object-free command-line decoders such as `samtools` reach several-fold
-higher *raw* throughput, but return no Bioconductor object; BamScale's role is
+higher *raw* throughput, but return no Bioconductor object; BamScaleR's role is
 fast, object-faithful decoding *inside* R.
 
 ## End-to-end impact tracks the read fraction
 
-Embedding BamScale as the read step of a complete workflow, the end-to-end speedup
+Embedding BamScaleR as the read step of a complete workflow, the end-to-end speedup
 follows how read-dominated that workflow is (Amdahl's law):
 
 ```{r spectrum-table}
@@ -122,13 +122,13 @@ ggplot(spectrum_tbl, aes(stats::reorder(Endpoint, Speedup), Speedup, fill = `Rea
   theme_minimal(base_size = 12)
 ```
 
-- **ATAC fragment-size QC** is nearly pure read, so BamScale's read speedup carries
+- **ATAC fragment-size QC** is nearly pure read, so BamScaleR's read speedup carries
   through almost intact: **4.14x** end-to-end.
 - **Coverage -> bigWig** is dominated by the shared, single-threaded
   `rtracklayer::export.bw` step (identical work on both arms), so the end-to-end
   gain is bounded at **1.24x** even though the read phase itself is 6.6x faster.
   Stopping at the in-memory coverage `RleList` -- what many analyses consume
-  next -- recovers a **3.29x** gain. (Since 0.99.14, `bam_coverage()` and
+  next -- recovers a **3.29x** gain. (`bam_coverage()` and
   `bam_coverage_bigwig()` compute these endpoints directly inside the reader,
   removing the R-side read phase entirely; see the function documentation.)
 
@@ -138,13 +138,13 @@ A multithreaded reader can occupy cores a single-threaded one cannot. At **match
 core counts** (both arms given the same number of cores) the two readers are
 approximately at parity for multi-file processing (coverage ~1.13x, ATAC ~0.99x):
 the single-threaded reader already saturates a machine by parallelising *across*
-files, so BamScale's multi-file advantage comes specifically from also threading
+files, so BamScaleR's multi-file advantage comes specifically from also threading
 *within* a file -- which pays off when there are fewer files than cores.
 
-## Beyond reading: in-reader aggregation (new in 0.99.14)
+## Beyond reading: in-reader aggregation
 
 For workflows whose endpoint is a summary rather than the alignments themselves,
-BamScale 0.99.14 adds four functions that fold the computation inside the
+BamScaleR provides four functions that fold the computation inside the
 multithreaded reader, so no per-read R objects are ever materialised:
 `fragment_sizes()` (paired-end fragment-size distribution),
 `mapq_dist()` (mapping-quality distribution), `bam_coverage()` (per-base coverage
@@ -163,12 +163,12 @@ coverage `RleList` is `identical()` to `GenomicAlignments::coverage()` on
 `readGAlignments` output at every thread count, and the ATAC fragment-size table is
 `identical()` to `Rsamtools::scanBam` and byte-identical (maximum absolute
 difference 0) to `ATACseqQC::fragSizeDist` over 49.8 million reads. This is what
-makes BamScale a genuine drop-in rather than an approximation.
+makes BamScaleR a genuine drop-in rather than an approximation.
 
 ## Try it
 
 ```{r demo, echo=TRUE, eval=TRUE}
-library(BamScale)
+library(BamScaleR)
 bam <- ompBAM::example_BAM("Unsorted")
 
 ## Alignment fields as a GAlignments object (drop-in for readGAlignments)
@@ -187,7 +187,7 @@ head(df)
 The complete benchmark harness ships under `inst/benchmarks/`:
 
 ```{r repro, echo=TRUE, eval=FALSE}
-dir(system.file("benchmarks", package = "BamScale"))
+dir(system.file("benchmarks", package = "BamScaleR"))
 # run_server_benchmark.R      : read-pattern micro-benchmarks (step1 / GAlignments / seq+qual)
 # run_workflow_benchmark.R    : end-to-end coverage and ATAC fragment-size QC workflows
 # download_atac_data.R        : fetch + index the ENCODE GM12878 ATAC BAMs used here

@@ -2,17 +2,17 @@
 % Please edit documentation in R/bam_read.R
 \name{decode_compact_qual}
 \alias{decode_compact_qual}
-\title{Decode compact BamScale quality output}
+\title{Decode compact BamScaleR quality output}
 \usage{
 decode_compact_qual(qual)
 }
 \arguments{
 \item{qual}{A list (or list-column) of \code{raw} vectors produced by compact
-BamScale quality extraction.}
+BamScaleR quality extraction.}
 }
 \value{
 A character vector containing decoded quality strings. Entries with
-all-missing quality bytes are returned as \code{"*"}, matching BamScale's
+all-missing quality bytes are returned as \code{"*"}, matching BamScaleR's
 compatibility mode.
 }
 \description{

@@ -2,7 +2,7 @@
 % Please edit documentation in R/bam_read.R
 \name{decode_seqqual_compact}
 \alias{decode_seqqual_compact}
-\title{Decode compact \code{seq} and \code{qual} columns in BamScale output}
+\title{Decode compact \code{seq} and \code{qual} columns in BamScaleR output}
 \usage{
 decode_seqqual_compact(
   x,
@@ -13,7 +13,7 @@ decode_seqqual_compact(
 }
 \arguments{
 \item{x}{A \code{data.frame}, \code{S4Vectors::DataFrame}, or list-like object
-containing compact BamScale \code{seq} and/or \code{qual} columns.}
+containing compact BamScaleR \code{seq} and/or \code{qual} columns.}
 
 \item{seq_col}{Name of the compact sequence column.}
 
