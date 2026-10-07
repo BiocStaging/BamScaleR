@@ -17,9 +17,18 @@
   0.99.0, as required for a new submission. The entries below document this
   package's history under its former name.
 
-# BamScale 0.99.14
+## Earlier history (as BamScale)
 
-## New features
+The entries below document this package's development under its former name,
+**BamScale**, before the rename described above. Those version numbers belong to
+the former name's series: BamScale was accepted into Bioconductor devel on
+4 May 2026 and never shipped in a numbered release, so version numbering
+restarts at 0.99.0 under the new name. The code described below is carried
+forward into BamScaleR unchanged.
+
+### BamScale 0.99.14
+
+#### New features
 
 * Four new exported functions compute common BAM summaries entirely inside the
   multithreaded C++ reader (per-thread accumulators folded in the OpenMP region;
@@ -56,7 +65,7 @@
   compression, and zoom-level construction from in-memory coverage runs instead
   of re-reading the just-written data section.
 
-## Performance
+#### Performance
 
 * Fixed a quadratic reallocation pattern in the reader's batch merge: per-batch
   exact-capacity `reserve()` calls copied all accumulated data on every batch.
@@ -71,7 +80,7 @@
   `fragment_sizes()` 5.4x vs `scanBam` + `table()`; `as = "GAlignments"` 4.8x
   vs `readGAlignments()` (and faster even single-threaded).
 
-## Bug fixes
+#### Bug fixes
 
 * `bam_coverage_bigwig()` now works on Windows: the output stream is opened in
   binary mode (`"w+b"`; text mode corrupted the bigWig), and zoom levels are
@@ -88,7 +97,7 @@
   installs always threaded. Tarball builds now carry the full build
   configuration (OpenMP, zlib, `-DNOCURL`, and the bundled libBigWig objects).
 
-## Benchmarks
+#### Benchmarks
 
 * `run_workflow_benchmark.R` gains first-class arms for the four new functions
   (`--include-fastcov/-bigwig/-fragsize/-mapq`), each behind an `identical()`
@@ -103,7 +112,7 @@
   `download_atac_data.R` with md5 verification, `samtools_reference.sh`,
   `merge_runs.R`, and the staged `run_manuscript_final.sh` orchestrator.
 
-## Tests
+#### Tests
 
 * New testthat gates: byte-identity of `fragment_sizes()` / `mapq_dist()` /
   `bam_coverage()` against their Rsamtools/GenomicAlignments equivalents;
@@ -112,9 +121,9 @@
   (threads 1/4, mcols order, `use.names`, flag/mapq filters, fast == slow,
   `gctorture`).
 
-# BamScale 0.99.13
+### BamScale 0.99.13
 
-## New features
+#### New features
 
 * On the compatible read path, `seq` and `qual` are now built directly in C as
   `DNAStringSet` / `PhredQuality` objects from the packed BAM byte buffer (via the
@@ -124,7 +133,7 @@
   (coverage → bigWig and ATAC fragment-size QC) and a self-contained
   `benchmark-results` vignette.
 
-## Bug fixes
+#### Bug fixes
 
 * `GAlignments` output now carries the BAM-header sequence lengths in its `Seqinfo`.
   Previously the seqlengths were `NA`, so `coverage()` extended each seqlevel only to
@@ -134,7 +143,7 @@
   and `GenomicAlignments` in `.onLoad`, so the compatible seq/qual and `GAlignments`
   paths resolve their constructors and classes on fresh `SnowParam` SOCK workers.
 
-## Documentation
+#### Documentation
 
 * Refreshed the README with the latest benchmark results (read-pattern and end-to-end
   workflow speedups) and Bioconductor installation instructions.
