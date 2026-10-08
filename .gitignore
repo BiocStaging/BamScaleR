@@ -79,3 +79,4 @@ scripts/manuscript_figs.R
 # Private manuscript (personal draft; not part of the package, never pushed)
 manuscript/
 inst/benchmarks/run_manuscript_final.sh
+Rplots.pdf
