@@ -2086,13 +2086,17 @@ static int bamscale_coverage_runs(
     stop("Failed to read BAM header");
   }
 
-  // Shared per-contig difference arrays sized to header lengths (+1 scratch slot
-  // so a block ending exactly at L needs no branch).
-  std::vector<std::vector<int> > delta(static_cast<size_t>(n_contigs));
-  for (int c = 0; c < n_contigs; ++c) {
-    delta[static_cast<size_t>(c)].assign(
-      static_cast<size_t>(chr_lens[static_cast<size_t>(c)]) + 1, 0);
-  }
+  // Per-thread, per-contig interval endpoints. Each covering CIGAR block
+  // contributes one start and one end; coverage is recovered by sorting and
+  // sweeping. Nothing here is sized by the header, so a BAM carrying few
+  // alignments costs little even when its header declares a whole genome.
+  // Thread-local buffers also keep the hot read loop free of atomics.
+  const size_t nt = static_cast<size_t>(threads);
+  const size_t nc = static_cast<size_t>(n_contigs);
+  std::vector<std::vector<std::vector<uint32_t> > > tl_s(
+      nt, std::vector<std::vector<uint32_t> >(nc));
+  std::vector<std::vector<std::vector<uint32_t> > > tl_e(
+      nt, std::vector<std::vector<uint32_t> >(nc));
 
   while (true) {
     const int state = inbam.fillReads();
@@ -2105,6 +2109,8 @@ static int bamscale_coverage_runs(
 #pragma omp parallel for num_threads(threads) schedule(static, 1)
 #endif
     for (unsigned int tid = 0; tid < threads; ++tid) {
+      std::vector<std::vector<uint32_t> >& ls = tl_s[static_cast<size_t>(tid)];
+      std::vector<std::vector<uint32_t> >& le = tl_e[static_cast<size_t>(tid)];
       while (true) {
         pbam1_t read(inbam.supplyRead(tid));
         if (!read.validate()) break;
@@ -2118,8 +2124,9 @@ static int bamscale_coverage_runs(
         const int this_mapq = static_cast<int>(read.mapq());
         if (this_mapq < min_mapq_clamped) continue;
 
-        int* dc = delta[static_cast<size_t>(ref_id)].data();
         const long L = static_cast<long>(chr_lens[static_cast<size_t>(ref_id)]);
+        std::vector<uint32_t>& vs = ls[static_cast<size_t>(ref_id)];
+        std::vector<uint32_t>& ve = le[static_cast<size_t>(ref_id)];
         long ref0 = static_cast<long>(read.pos());         // 0-based POS
         const uint32_t nop = read.cigar_size();
         const uint32_t* cig = read.cigar();
@@ -2136,14 +2143,8 @@ static int bamscale_coverage_runs(
             if (e < 0) e = 0;
             if (e > L) e = L;
             if (s < e) {
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-              dc[s] += 1;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-              dc[e] -= 1;
+              vs.push_back(static_cast<uint32_t>(s));
+              ve.push_back(static_cast<uint32_t>(e));
             }
             ref0 += oplen;
           } else if (op == 3U) {                               // N : gap, consume ref only
@@ -2157,46 +2158,78 @@ static int bamscale_coverage_runs(
 
   inbam.closeFile();
 
-  // Prefix-sum each contig into run-length-encoded coverage. Contigs are
+  // Sweep each contig's endpoints into run-length-encoded coverage. Contigs are
   // independent -> parallelise across them. Zero-read contigs yield a single run
-  // {value 0, length L}. Runs are fully coalesced (no adjacent equal values) to
-  // match coverage()'s Rle exactly.
-  out_rv.assign(static_cast<size_t>(n_contigs), std::vector<int>());
-  out_rl.assign(static_cast<size_t>(n_contigs), std::vector<int>());
+  // {value 0, length L} without allocating anything. Runs are fully coalesced
+  // (no adjacent equal values) to match coverage()'s Rle exactly.
+  out_rv.assign(nc, std::vector<int>());
+  out_rl.assign(nc, std::vector<int>());
 
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(threads) schedule(dynamic, 1)
 #endif
   for (int c = 0; c < n_contigs; ++c) {
-    const long L = static_cast<long>(chr_lens[static_cast<size_t>(c)]);
-    const int* dc = delta[static_cast<size_t>(c)].data();
-    std::vector<int>& rv = out_rv[static_cast<size_t>(c)];
-    std::vector<int>& rl = out_rl[static_cast<size_t>(c)];
-    long long acc = 0;
-    int cur_val = 0;
-    long cur_len = 0;
-    for (long i = 0; i < L; ++i) {
-      acc += static_cast<long long>(dc[i]);
-      const int v = static_cast<int>(acc);
-      if (cur_len == 0) {
-        cur_val = v; cur_len = 1;
-      } else if (v == cur_val) {
-        ++cur_len;
+    const size_t cs = static_cast<size_t>(c);
+    const long L = static_cast<long>(chr_lens[cs]);
+    std::vector<int>& rv = out_rv[cs];
+    std::vector<int>& rl = out_rl[cs];
+    if (L <= 0) continue;                      // zero-length contig -> empty Rle
+
+    size_t n_ev = 0;
+    for (size_t t = 0; t < nt; ++t) n_ev += tl_s[t][cs].size();
+
+    if (n_ev == 0) {                           // no alignments -> one zero run
+      rv.push_back(0);
+      rl.push_back(static_cast<int>(L));
+      continue;
+    }
+
+    std::vector<uint32_t> S, E;
+    S.reserve(n_ev); E.reserve(n_ev);
+    for (size_t t = 0; t < nt; ++t) {
+      const std::vector<uint32_t>& a = tl_s[t][cs];
+      const std::vector<uint32_t>& b = tl_e[t][cs];
+      S.insert(S.end(), a.begin(), a.end());
+      E.insert(E.end(), b.begin(), b.end());
+    }
+    std::sort(S.begin(), S.end());
+    std::sort(E.begin(), E.end());
+
+    long cur = 0;          // position of the start of the current run
+    long long depth = 0;   // coverage depth over [cur, next event)
+    size_t i = 0, j = 0;
+    while (i < S.size() || j < E.size()) {
+      long np;
+      if (i < S.size() && j < E.size())      np = std::min(static_cast<long>(S[i]), static_cast<long>(E[j]));
+      else if (i < S.size())                 np = static_cast<long>(S[i]);
+      else                                   np = static_cast<long>(E[j]);
+      if (np > cur) {                        // flush the constant-depth stretch
+        const int v = static_cast<int>(depth);
+        if (!rv.empty() && rv.back() == v) {
+          rl.back() += static_cast<int>(np - cur);
+        } else {
+          rv.push_back(v);
+          rl.push_back(static_cast<int>(np - cur));
+        }
+        cur = np;
+      }
+      while (i < S.size() && static_cast<long>(S[i]) == cur) { ++depth; ++i; }
+      while (j < E.size() && static_cast<long>(E[j]) == cur) { --depth; ++j; }
+    }
+    if (cur < L) {                           // trailing uncovered tail (depth == 0)
+      const int v = static_cast<int>(depth);
+      if (!rv.empty() && rv.back() == v) {
+        rl.back() += static_cast<int>(L - cur);
       } else {
-        rv.push_back(cur_val);
-        rl.push_back(static_cast<int>(cur_len));
-        cur_val = v; cur_len = 1;
+        rv.push_back(v);
+        rl.push_back(static_cast<int>(L - cur));
       }
     }
-    if (cur_len > 0) {
-      rv.push_back(cur_val);
-      rl.push_back(static_cast<int>(cur_len));
-    }
-    // L == 0 -> rv/rl empty (a zero-length Rle).
   }
 
-  // Free the large delta arrays before returning.
-  std::vector<std::vector<int> >().swap(delta);
+  // Release the endpoint buffers.
+  std::vector<std::vector<std::vector<uint32_t> > >().swap(tl_s);
+  std::vector<std::vector<std::vector<uint32_t> > >().swap(tl_e);
   return n_contigs;
 }
 
