@@ -31,21 +31,23 @@ track generation and ATAC-seq fragment-size QC — with BamScaleR output verifie
 **byte-identical** to the standard tools.
 
 The numbers below are a concise summary of a representative benchmark run
-(Intel Xeon Gold 6252, 96 cores; warm page cache; median of 5 iterations). The
+(a deeply sequenced public ENCODE ATAC-seq BAM, ENCFF191LNL, 151,057,932
+alignments; Intel Xeon Gold 6252, 96 logical cores; warm page cache; median of 5
+iterations). The
 benchmark harness that produces them is in `inst/benchmarks/`
 (`run_server_benchmark.R`, `run_workflow_benchmark.R`); see the last section to
 reproduce the full results.
 
 ```{r results-data}
-## Summary results (benchmark run 2026-08-10, BamScale 0.99.14 -- the predecessor of this package; see
-## inst/benchmarks/ to reproduce).
+## Summary results (benchmark run 2026-10-08, BamScaleR 0.99.1, on the 25-file
+## public ENCODE ATAC-seq corpus; see inst/benchmarks/ to reproduce).
 read_tbl <- data.frame(
   Workload    = c("Core fields", "GAlignments", "Sequence + quality"),
   Reads       = c("qname/flag/rname/pos/mapq/cigar", "-> GAlignments object", "seq + base quality"),
-  `Standard (s)` = c(15.4, 10.6, 21.6),
-  `BamScaleR (s)` = c(6.3, 2.6, 7.0),
-  Threads     = c(48L, 48L, 48L),
-  Speedup     = c(2.45, 4.03, 3.09),
+  `Standard (s)` = c(263.3, 290.1, 409.8),
+  `BamScaleR (s)` = c(136.0, 115.9, 179.3),
+  Threads     = c(36L, 72L, 24L),
+  Speedup     = c(1.94, 2.50, 2.29),
   check.names = FALSE
 )
 
@@ -53,15 +55,15 @@ spectrum_tbl <- data.frame(
   Endpoint      = c("ATAC fragment-size QC", "GAlignments (read)", "Coverage -> RleList",
                     "Sequence + quality (read)", "Core fields (read)", "Coverage -> bigWig"),
   Layer         = c("workflow", "read", "workflow", "read", "read", "workflow"),
-  `Read fraction` = c(0.92, 1.00, 0.76, 1.00, 1.00, 0.22),
-  Speedup       = c(4.14, 4.03, 3.29, 3.09, 2.45, 1.24),
+  `Read fraction` = c(0.94, 1.00, 0.72, 1.00, 1.00, 0.41),
+  Speedup       = c(4.39, 2.50, 2.49, 2.29, 1.94, 1.52),
   check.names = FALSE
 )
 ```
 
 ## Read throughput on a single large BAM
 
-On a single large BAM, BamScaleR reads **2.5--4x faster** than the standard reader
+On a single large BAM, BamScaleR reads **1.9--2.5x faster** than the standard reader
 across three representative access patterns, because it spreads the BGZF decode
 across cores and assembles the output objects in native code:
 
@@ -123,12 +125,12 @@ ggplot(spectrum_tbl, aes(stats::reorder(Endpoint, Speedup), Speedup, fill = `Rea
 ```
 
 - **ATAC fragment-size QC** is nearly pure read, so BamScaleR's read speedup carries
-  through almost intact: **4.14x** end-to-end.
+  through almost intact: **4.39x** end-to-end.
 - **Coverage -> bigWig** is dominated by the shared, single-threaded
   `rtracklayer::export.bw` step (identical work on both arms), so the end-to-end
-  gain is bounded at **1.24x** even though the read phase itself is 6.6x faster.
+  gain is bounded at **1.52x** even though the read phase itself is 5.9x faster.
   Stopping at the in-memory coverage `RleList` -- what many analyses consume
-  next -- recovers a **3.29x** gain. (`bam_coverage()` and
+  next -- recovers a **2.49x** gain. (`bam_coverage()` and
   `bam_coverage_bigwig()` compute these endpoints directly inside the reader,
   removing the R-side read phase entirely; see the function documentation.)
 
@@ -136,7 +138,7 @@ ggplot(spectrum_tbl, aes(stats::reorder(Endpoint, Speedup), Speedup, fill = `Rea
 
 A multithreaded reader can occupy cores a single-threaded one cannot. At **matched
 core counts** (both arms given the same number of cores) the two readers are
-approximately at parity for multi-file processing (coverage ~1.13x, ATAC ~0.99x):
+approximately at parity for multi-file processing (coverage ~1.20x, ATAC ~0.97x):
 the single-threaded reader already saturates a machine by parallelising *across*
 files, so BamScaleR's multi-file advantage comes specifically from also threading
 *within* a file -- which pays off when there are fewer files than cores.
@@ -162,7 +164,7 @@ Every speedup above is against output verified equal to the standard tool. The
 coverage `RleList` is `identical()` to `GenomicAlignments::coverage()` on
 `readGAlignments` output at every thread count, and the ATAC fragment-size table is
 `identical()` to `Rsamtools::scanBam` and byte-identical (maximum absolute
-difference 0) to `ATACseqQC::fragSizeDist` over 49.8 million reads. This is what
+difference 0) to `ATACseqQC::fragSizeDist` over all 151,057,932 alignments. This is what
 makes BamScaleR a genuine drop-in rather than an approximation.
 
 ## Try it
